@@ -1,0 +1,7 @@
+pytorch==1.9.1
+torchvision==0.10.1
+timm==0.4.12
+termcolor==1.1.0
+pillow==8.4.0
+matplotlib==3.5.1
+torchprofile==0.0.4

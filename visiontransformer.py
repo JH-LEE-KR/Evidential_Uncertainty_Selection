@@ -19,10 +19,9 @@ Hacked together by / Copyright 2021 Ross Wightman
 # Added code for EViT training -- Copyright 2022 Youwei Liang
 # ------------------------------------------
 # * Original Code
-# * https://github.com/youweiliang/evit/blob/master/vision_transformer.py
-# * Using Token Reorganization method for select important tokens and apply them to Vision Trnasformer based Lifelong Learning
+# * https://github.com/youweiliang/evit/blob/master/evit.py
 # * Modification:
-# * Remove unnecessary parts of my model and add code for training Lifelong Vision Transformer.
+# * Remove unnecessary parts for my model and add code for uncertainty based selection
 """
 
 import math

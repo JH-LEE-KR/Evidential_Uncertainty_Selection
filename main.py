@@ -3,14 +3,13 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms
+from torchvision import datasets
 
 from utils import *
 from engine import *
 from logger import create_logger
 from models import *
 from helpers import *
-from losses import *
 
 from timm.models import create_model
 
@@ -22,10 +21,11 @@ def get_args_pareser():
     # -----------------------------------------------------------------------------
     # Data settings
     # -----------------------------------------------------------------------------
-    parser.add_argument('--data_path', type = str, default = '/root/default/dataset/', help = 'Path of datasets')
+    parser.add_argument('--data_path', type = str, default = '/local_datasets/', help = 'Path of datasets')
     parser.add_argument('--save_path', type = str, default = './checkpoint/', help = 'Path to save model')
     parser.add_argument('--output_path', type = str, default = './output/', help = 'Path to save output')
-    parser.add_argument('--checkpoint', type = bool, default = False, help = 'Load model from checkpoint or not')
+    parser.add_argument('--sample_path', type = str, default = './sample/', help = 'Path of test samples')
+    parser.add_argument('--checkpoint', action="store_true", help = 'Load model from checkpoint or not')
     parser.add_argument('--num_workers', default=4, type=int, help='Number of data loading workers')
     parser.add_argument('--dataset', default='mnist', type=str, help='Dataset name')
 
@@ -76,18 +76,19 @@ def get_args_pareser():
     parser.add_argument('--visualize', action="store_true", default=False, help = 'Whether to visulize the output')
     parser.add_argument('--n_visualize', type=int, default=1, help='Number of images to visualize')
     parser.add_argument('--speed_test', action='store_true', help='Only test speed')
+    parser.add_argument('--eval', action='store_true', help='Only evaluate')
 
     # -----------------------------------------------------------------------------
     #  Selection settings
     # -----------------------------------------------------------------------------
-    parser.add_argument('--base_keep_rate', type=float, default=0.7, help='Base keep rate (default: 0.7)')
+    parser.add_argument('--base_keep_rate', type=float, default=1.0, help='Base keep rate (default: 0.7)')
     parser.add_argument('--drop_loc', default='(3, 6, 9)', type=str, help='the layer indices for shrinking inattentive tokens')
 
     # -----------------------------------------------------------------------------
     #  Uncertainty settings
     # -----------------------------------------------------------------------------
-    parser.add_argument("--uncertainty", action="store_true", default=False, help="Use uncertainty or not.")
-    parser.add_argument('--uncertainty_keep_rate', type=float, default=0.8, help='Base drop rate (default: 0.9)')
+    parser.add_argument("--uncertainty", action="store_true", help="Use uncertainty or not.")
+    parser.add_argument('--uncertainty_keep_rate', type=float, default=0.8, help='Base drop rate (default: 0.8)')
     parser.add_argument("--mse", action="store_true", help="Set this argument when using uncertainty. Sets loss function to Expected Mean Square Error.")
     parser.add_argument("--digamma", action="store_true", help="Set this argument when using uncertainty. Sets loss function to Expected Cross Entropy.")
     parser.add_argument("--log", action="store_true", help="Set this argument when using uncertainty. Sets loss function to Negative Log of the Expected Likelihood.")
@@ -108,7 +109,7 @@ def main(args, logger):
     # Create dataloader
     if args.dataset == 'cifar10':
         train_dataset = datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
-        test_dataset = datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=val_transform)
+        val_dataset = datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=val_transform)
         args.in_chans = 3
     elif args.dataset == 'mnist':
         train_dataset = datasets.MNIST(root=args.data_path, train=True, download=True, transform=train_transform)
@@ -137,9 +138,8 @@ def main(args, logger):
     logger.info('[Model]: \n{}'.format(model))
 
     if args.speed_test:
-        if args.checkpoint:
-            model.load_state_dict(torch.load('./checkpoint/vit_mnist_ft.pth')['model_state_dict'])
-            model = model.to(args.device)
+        model.load_state_dict(torch.load('{}/vit_mnist_ft.pth'.format(args.save_path))['model_state_dict'])
+        model = model.to(args.device)
 
         inference_speed = speed_test(model, args)
         logger.info('[Inference_speed (inaccurate)]: {:.4f}images/s'.format(inference_speed))
@@ -158,14 +158,26 @@ def main(args, logger):
         elif args.dataset == 'mnist':
             classes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
         
-        if args.checkpoint:
-            model.load_state_dict(torch.load('./checkpoint/vit_mnist_ft.pth')['model_state_dict'])
-            model = model.to(args.device)
+        model.load_state_dict(torch.load('{}/vit_mnist_ft.pth'.format(args.save_path))['model_state_dict'])
+        model = model.to(args.device)
         
         for i in range(args.n_visualize):
             for c in classes:
-                eval_single_image(model, '/root/default/vit_mnist_selection_evidential/MNIST-JPG/testing/{}/000{}.jpg'.format(c, i), args)
+                eval_single_image(model, '{}{}/{}.jpg'.format(args.sample_path, c, i), args)
         return
+    
+    if args.eval:
+        model.load_state_dict(torch.load('{}/vit_mnist_ft.pth'.format(args.save_path))['model_state_dict'])
+        model = model.to(args.device)
+
+        total_acc = eval_model(model, val_loader, args, logger)
+
+        logger.info('[Total Acc]: {}'.format(total_acc))
+        return
+    
+    if args.checkpoint:
+        model.load_state_dict(torch.load('{}/vit_mnist_ft.pth'.format(args.save_path))['model_state_dict'])
+        model = model.to(args.device)
     
     model = model.to(args.device)
 

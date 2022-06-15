@@ -1,3 +1,10 @@
+"""
+# * Original Code
+# * https://github.com/microsoft/Swin-Transformer/blob/main/logger.py
+# * Modification:
+# * Remove unnecessary parts for my model and add code for my logging
+"""
+
 import os
 import sys
 import logging

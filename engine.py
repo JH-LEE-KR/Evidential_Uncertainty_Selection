@@ -1,30 +1,23 @@
 import time
+import math
+import os
+import datetime
+import numpy as np
+
 import torch.nn as nn
 import torch
-from timm.utils import accuracy, AverageMeter
-import datetime
-import math
-from utils import *
-import torch.nn.functional as F
-import time
-from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-import torch
-from einops import rearrange
-from timm.utils import accuracy, AverageMeter
-import datetime
-import math
-from utils import *
-from losses import relu_evidence
-from PIL import Image
-import matplotlib.pyplot as plt
-import numpy as np
-import os
 from torch.autograd import Variable
-import torch.nn.functional as F
 import torchvision.transforms as transforms
 
-def relu_evidence(y):
-    return F.relu(y)
+from timm.utils import accuracy, AverageMeter
+from PIL import Image
+import matplotlib.pyplot as plt
+
+from utils import *
+from losses import *
+
+
+
 
 def train_model(model, criterion, dataloader, optimizer, scheduler, args, logger):
     model.train()
@@ -169,31 +162,18 @@ def eval_single_image(model, img_path, args):
     img_variable = Variable(img_tensor)
     img_variable = img_variable.to(args.device)
 
-
-    if args.uncertainty:
-        output, _ = model(img_variable)
-        evidence = relu_evidence(output)
-        alpha = evidence + 1
-        uncertainty = num_classes / torch.sum(alpha, dim=1, keepdim=True)
-        _, preds = torch.max(output, 1)
-        prob = alpha / torch.sum(alpha, dim=1, keepdim=True)
-        output = output.flatten()
-        prob = prob.flatten()
-        preds = preds.flatten()
-        print("Predict:", preds[0])
-        print("Probs:", prob)
-        print("Uncertainty:", uncertainty)
-
-    else:
-
-        output, _ = model(img_variable)
-        _, preds = torch.max(output, 1)
-        prob = F.softmax(output, dim=1)
-        output = output.flatten()
-        prob = prob.flatten()
-        preds = preds.flatten()
-        print("Predict:", preds[0])
-        print("Probs:", prob)
+    output, _ = model(img_variable)
+    evidence = relu_evidence(output)
+    alpha = evidence + 1
+    uncertainty = num_classes / torch.sum(alpha, dim=1, keepdim=True)
+    _, preds = torch.max(output, 1)
+    prob = alpha / torch.sum(alpha, dim=1, keepdim=True)
+    output = output.flatten()
+    prob = prob.flatten()
+    preds = preds.flatten()
+    print("Predict:", preds[0])
+    print("Probs:", prob)
+    print("Uncertainty:", uncertainty)
 
     labels = np.arange(10)
     fig = plt.figure(figsize=[6.2, 5])
@@ -214,4 +194,10 @@ def eval_single_image(model, img_path, args):
 
     plt.tight_layout()
 
-    plt.savefig("./results/{}".format(img_path.split("/")[-2] + img_path.split("/")[-1]))
+    save_path = img_path.replace(args.sample_path, args.output_path)
+
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path))
+    
+    plt.savefig(save_path, dpi = 300)
+    plt.close()

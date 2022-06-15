@@ -1,3 +1,8 @@
+"""
+# * Original Code
+# * https://github.com/dougbrion/pytorch-classification-uncertainty/blob/master/losses.py
+"""
+
 import torch
 import torch.nn.functional as F
 

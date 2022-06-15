@@ -5,7 +5,7 @@ import numpy as np
 
 import torch
 
-from torchvision import datasets, transforms
+from torchvision import transforms
 
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.data import create_transform
