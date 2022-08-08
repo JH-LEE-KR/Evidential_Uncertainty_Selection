@@ -1,4 +1,5 @@
 import argparse
+from sched import scheduler
 
 import torch
 import torch.nn as nn
@@ -14,7 +15,7 @@ from helpers import *
 from timm.models import create_model
 
 import warnings
-warnings.filterwarnings('ignore', 'Argument interpolation should be of type InterpolationMode instead of int')
+warnings.filterwarnings(action='ignore', message='.*Please use InterpolationMode enum.')
 
 def get_args_pareser():
     parser = argparse.ArgumentParser(description='ViT')
@@ -27,7 +28,7 @@ def get_args_pareser():
     parser.add_argument('--sample_path', type = str, default = './sample/', help = 'Path of test samples')
     parser.add_argument('--checkpoint', action="store_true", help = 'Load model from checkpoint or not')
     parser.add_argument('--num_workers', default=4, type=int, help='Number of data loading workers')
-    parser.add_argument('--dataset', default='mnist', type=str, help='Dataset name')
+    parser.add_argument('--dataset', default='cifar100', type=str, help='Dataset name')
 
     # -----------------------------------------------------------------------------
     # Model settings
@@ -45,8 +46,9 @@ def get_args_pareser():
                         'batch size of all GPUs on the current node'
                         'when using Data Parallel or Distributed Data Parallel')
     parser.add_argument('--epoch', type=int, default=50, help='The number of epochs to train')
+    parser.add_argument('--warmup_epoch', type=int, default=0, help='The number of warmup epochs')
     parser.add_argument('--input_size', type=int, default=224, help='The size of input')
-    parser.add_argument('--lr', type=float, default=0.001, help='The learning rate')
+    parser.add_argument('--lr', type=float, default=0.003, help='The learning rate')
     
 
     # -----------------------------------------------------------------------------
@@ -54,6 +56,7 @@ def get_args_pareser():
     # -----------------------------------------------------------------------------
     parser.add_argument('--momentum', type=float, default=0.9, help='The momentum for SGD')
     parser.add_argument('--weight_decay', type=float, default=5e-4, help='The weight decay')
+    parser.add_argument('--scheduler', type=bool, default=False, help='Use schduler or not')
 
 
     # -----------------------------------------------------------------------------
@@ -73,20 +76,20 @@ def get_args_pareser():
     # -----------------------------------------------------------------------------
     parser.add_argument('--seed', default=0, type=int, help='Seed for initializing training')
     parser.add_argument('--print_freq', type=int, default=10, help = 'The frequency of printing')
-    parser.add_argument('--visualize', action="store_true", default=False, help = 'Whether to visulize the output')
-    parser.add_argument('--n_visualize', type=int, default=1, help='Number of images to visualize')
     parser.add_argument('--speed_test', action='store_true', help='Only test speed')
     parser.add_argument('--eval', action='store_true', help='Only evaluate')
 
     # -----------------------------------------------------------------------------
     #  Selection settings
     # -----------------------------------------------------------------------------
-    parser.add_argument('--base_keep_rate', type=float, default=1.0, help='Base keep rate (default: 0.7)')
+    parser.add_argument('--base_keep_rate', type=float, default=0.7, help='Base keep rate (default: 0.7)')
     parser.add_argument('--drop_loc', default='(3, 6, 9)', type=str, help='the layer indices for shrinking inattentive tokens')
 
     # -----------------------------------------------------------------------------
     #  Uncertainty settings
     # -----------------------------------------------------------------------------
+    parser.add_argument('--uncertainty-loss', action='store_true', help='Use uncertainty loss or not')
+    parser.add_argument('--uncertainty_weight', type=float, default=1.0 , help='The weight of uncertainty loss')
     parser.add_argument('--uncertainty_keep_rate', type=float, default=0.8, help='Base drop rate (default: 0.8)')
     parser.add_argument("--mse", action="store_true", help="Set this argument when using uncertainty. Sets loss function to Expected Mean Square Error.")
     parser.add_argument("--digamma", action="store_true", help="Set this argument when using uncertainty. Sets loss function to Expected Cross Entropy.")
@@ -110,12 +113,19 @@ def main(args, logger):
         train_dataset = datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=train_transform)
         val_dataset = datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=val_transform)
         args.in_chans = 3
+
+    elif args.dataset == 'cifar100':
+        train_dataset = datasets.CIFAR100(root=args.data_path, train=True, download=True, transform=train_transform)
+        val_dataset = datasets.CIFAR100(root=args.data_path, train=False, download=True, transform=val_transform)
+        args.in_chans = 3
+
     elif args.dataset == 'mnist':
         train_dataset = datasets.MNIST(root=args.data_path, train=True, download=True, transform=train_transform)
         val_dataset = datasets.MNIST(root=args.data_path, train=False, download=True, transform=val_transform)
         args.in_chans = 1
+
     else:
-        raise ValueError("Dataset should be in [cifar10, mnist]")
+        raise ValueError("Dataset should be in [cifar10, cifar100, mnist]")
 
     args.num_classes = len(train_dataset.classes)
     
@@ -126,6 +136,7 @@ def main(args, logger):
     # Create model
     model = create_model(
         args.model,
+        pretrained=args.pretrained,
         base_keep_rate=args.base_keep_rate,
         uncertainty_keep_rate=args.uncertainty_keep_rate,
         drop_loc=eval(args.drop_loc),
@@ -136,7 +147,7 @@ def main(args, logger):
     logger.info('[Model]: \n{}'.format(model))
 
     if args.speed_test:
-        model.load_state_dict(torch.load('{}/vit_mnist_ft.pth'.format(args.save_path))['model_state_dict'])
+        model.load_state_dict(torch.load(args.save_path + 'checkpoint.pth'))
         model = model.to(args.device)
 
         inference_speed = speed_test(model, args)
@@ -149,33 +160,18 @@ def main(args, logger):
         logger.info('[GMACs]: {:.4f}'.format(MACs * 1e-9))
 
         return
-    
-    if args.visualize:
-        if args.dataset == 'cifar10':
-            classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
-        elif args.dataset == 'mnist':
-            classes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
         
-        model.load_state_dict(torch.load('{}/vit_mnist_ft.pth'.format(args.save_path))['model_state_dict'])
-        model = model.to(args.device)
-        
-        for i in range(args.n_visualize):
-            for c in classes:
-                eval_single_image(model, '{}{}/{}.jpg'.format(args.sample_path, c, i), args)
-        return
-    
     if args.eval:
-        model.load_state_dict(torch.load('{}/vit_mnist_ft.pth'.format(args.save_path))['model_state_dict'])
+        model.load_state_dict(torch.load(args.save_path + 'best_model.pth'))
         model = model.to(args.device)
 
-        total_acc = eval_model(model, val_loader, args, logger)
+        final_acc = eval_model(model, val_loader, args, logger)
 
-        logger.info('[Total Acc]: {}'.format(total_acc))
+        logger.info('[Final Acc]: {}'.format(final_acc))
         return
     
     if args.checkpoint:
-        model.load_state_dict(torch.load('{}/vit_mnist_ft.pth'.format(args.save_path))['model_state_dict'])
-        model = model.to(args.device)
+        model.load_state_dict(torch.load(args.save_path + 'checkpoint.pth'))
     
     model = model.to(args.device)
 
@@ -183,27 +179,28 @@ def main(args, logger):
     optimizer = optim.SGD(model.parameters(), lr = args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     # Create scheduler
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1) if args.scheduler else None
 
     # Create criterion
     criterion = nn.CrossEntropyLoss()
 
     start_time = time.time()
 
-    train_model(model, criterion, train_loader, optimizer, scheduler, args, logger)
-    total_acc = eval_model(model, val_loader, args, logger)
+    train_loss, train_acc1 = train_model(model, criterion, train_loader, val_loader, optimizer, scheduler, args, logger)
+    final_acc, _ = eval_model(model, val_loader, args, logger)
 
 
     logger.info('[Time Elapsed]: {}'.format(time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))))
-
-    logger.info('[Total Acc]: {}'.format(total_acc))
+    logger.info('[Train Acc1]: {}'.format(train_acc1))
+    logger.info('[Train loss]: {}'.format(train_loss))
+    logger.info('[Final Acc]: {}'.format(final_acc))
 
     try:
         if not os.path.exists(args.save_path):
             os.makedirs(args.save_path)
     except OSError:
         print ('=> Error: Failed to create directory')
-    torch.save({'model_state_dict': model.state_dict()}, args.save_path + 'vit_mnist_ft.pth')
+    torch.save(model.state_dict(), args.save_path + 'checkpoint.pth')
 
 if __name__ == '__main__':
     args = get_args_pareser()
@@ -213,8 +210,6 @@ if __name__ == '__main__':
     
     logger, file_name = create_logger(args.output_path, args.model)
 
-    with open(os.path.join(args.output_path, file_name), 'a') as f:
-        f.write('\n[Arguments]\n{}'.format(str(args)))
     logger.info(f"Full config saved to {os.path.join(args.output_path, file_name)}")
     logger.info('\n[Arguments]\n{}'.format(str(args)))
     

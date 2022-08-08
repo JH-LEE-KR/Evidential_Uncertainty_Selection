@@ -21,10 +21,11 @@ python main.py \
     --data_path $data_path \
     --output_path $output_path \
     --model su_vit_tiny_patch16_224 \
-    --dataset mnist \
+    --epoch 50 \
+    --dataset cifar100 \
     --base_keep_rate 0.7 \
     --uncertainty_keep_rate 0.8 \
-    --epoch 30 \
+    --uncertainty_loss \
     --batch_size 256 \
     --input_size 224 \
 

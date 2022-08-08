@@ -38,7 +38,6 @@ from timm.models.helpers import build_model_with_cfg, named_apply, adapt_input_c
 from timm.models.layers import trunc_normal_, lecun_normal_, to_2tuple
 from timm.models.registry import register_model
 
-from losses import relu_evidence
 _logger = logging.getLogger(__name__)
 
 
@@ -520,7 +519,7 @@ class VisionTransformer(nn.Module):
                         out = self.head(x[:, i])
 
                         # Measure uncertainty
-                        evidence = relu_evidence(out)
+                        evidence = F.relu(out)
                         alpha = evidence + 1
                         u = self.num_classes / torch.sum(alpha, dim=1, keepdim=True)
                         uncertainty.append(u.flatten())

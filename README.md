@@ -25,7 +25,7 @@ git clone https://github.com/Lee-JH-KR/Evidential_Uncertainty_Selection.git
 Change directory to the cloned repository by running `cd Evidential_Uncertainty_Selection`, install necessary packages.
 
 ## Training
-To train model on MNIST, set the `data_path` (path to dataset) and `output_path` (result logging directory) in `train.sh` properly and run in Slurm system or `sh ./train.sh`.
+To train model on MNIST, set the `data_path` (path to dataset) and `output_path` (result logging directory) in `train.sh` properly and run in Slurm system or `bash ./train.sh`.
 
 Set `--base_keep_rate` and `--uncertainty_keep_rate` in train.sh `to use a different keep rate, and set `.
 
@@ -39,12 +39,6 @@ python main.py --eval
 ## Throughput
 You can measure the throughput of the model by passing `--speed_test` to `main.py`.
 
-## Visualization
-You can visualize the original image and predict results by a command like this:
-```
-python main.py --visualize --n_visualize 5
-```
-`--n_visaulize` determines how many samples to visualize for each class.
 
 # License
 This repository is released under the Apache 2.0 license as found in the [LICENSE](LICENSE) file.
