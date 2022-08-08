@@ -57,6 +57,7 @@ def get_args_pareser():
     parser.add_argument('--momentum', type=float, default=0.9, help='The momentum for SGD')
     parser.add_argument('--weight_decay', type=float, default=5e-4, help='The weight decay')
     parser.add_argument('--scheduler', type=bool, default=False, help='Use schduler or not')
+    parser.add_argument('--step_size', type=int, default=30, help='The step size for schduler')
 
 
     # -----------------------------------------------------------------------------
@@ -179,7 +180,7 @@ def main(args, logger):
     optimizer = optim.SGD(model.parameters(), lr = args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
     # Create scheduler
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1) if args.scheduler else None
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=0.1) if args.scheduler else None
 
     # Create criterion
     criterion = nn.CrossEntropyLoss()
