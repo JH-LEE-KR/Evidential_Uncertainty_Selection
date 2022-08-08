@@ -11,13 +11,13 @@
 #SBATCH -o %x_%j.out
 #SBTACH -e %x_%j.err
 
-source /root/data/init.sh
+source /data/jaeho/init.sh
 conda activate uncertainty
 
 data_path="/local_datasets/"
 output_path="./output/"
 
-CUDA_VISIBLE_DEVICES=3 python main.py \
+python main.py \
     --data_path $data_path \
     --output_path $output_path \
     --model su_vit_tiny_patch16_224 \
