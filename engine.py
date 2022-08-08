@@ -37,11 +37,7 @@ def train_model(model, criterion, dataloader, optimizer, scheduler, args, logger
 
         for batch_idx, (input, target) in enumerate(dataloader):
             input, target = input.to(args.device), target.to(args.device)
-
-            if args.uncertainty:
-                one_hot = one_hot_embedding(target, args.num_classes)
-                one_hot = one_hot.to(args.device)
-
+            
             output, _ = model(input)
 
             loss = criterion(output, target)
