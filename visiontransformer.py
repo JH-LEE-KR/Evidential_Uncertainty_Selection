@@ -374,7 +374,7 @@ class VisionTransformer(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, embed_dim=768, depth=12,
                  num_heads=12, mlp_ratio=4., qkv_bias=True, representation_size=None, distilled=False,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0., embed_layer=PatchEmbed, norm_layer=None,
-                 act_layer=None, weight_init='', global_pool='token', keep_rate=(1,), uncertainty_keep_rate=1.0, uncertainty=False):
+                 act_layer=None, weight_init='', global_pool='token', keep_rate=(1,), uncertainty_keep_rate=1.0,):
         """
         Args:
             img_size (int, tuple): input image size
@@ -402,7 +402,6 @@ class VisionTransformer(nn.Module):
         self.keep_rate = keep_rate
         self.uncertainty_keep_rate = uncertainty_keep_rate
         self.depth = depth
-        self.uncertainty = uncertainty
         self.num_heads = num_heads
         self.depth = depth
         self.patch_size = patch_size
@@ -515,31 +514,30 @@ class VisionTransformer(nn.Module):
             if idx is not None:
                 idxs.append(idx)
                 
-                if self.uncertainty:
-                    uncertainty = []
-                    with torch.no_grad():
-                        for i in range(1, x.shape[1]):
-                            out = self.head(x[:, i])
+                uncertainty = []
+                with torch.no_grad():
+                    for i in range(1, x.shape[1]):
+                        out = self.head(x[:, i])
 
-                            # Measure uncertainty
-                            evidence = relu_evidence(out)
-                            alpha = evidence + 1
-                            u = self.num_classes / torch.sum(alpha, dim=1, keepdim=True)
-                            uncertainty.append(u.flatten())
-                        
-                        uncertainty = torch.stack(uncertainty, dim=1)
+                        # Measure uncertainty
+                        evidence = relu_evidence(out)
+                        alpha = evidence + 1
+                        u = self.num_classes / torch.sum(alpha, dim=1, keepdim=True)
+                        uncertainty.append(u.flatten())
+                    
+                    uncertainty = torch.stack(uncertainty, dim=1)
 
-                    left_token = x.shape[1] - 1
-                    if self.uncertainty_keep_rate < 1:
-                        left_token = math.ceil(self.uncertainty_keep_rate * (x.shape[1] - 1))
-                        assert left_token >= 1
-                        _, idx = torch.topk(uncertainty, left_token, dim=1, largest=False, sorted=False)  # [B, left_token]
+                left_token = x.shape[1] - 1
+                if self.uncertainty_keep_rate < 1:
+                    left_token = math.ceil(self.uncertainty_keep_rate * (x.shape[1] - 1))
+                    assert left_token >= 1
+                    _, idx = torch.topk(uncertainty, left_token, dim=1, largest=False, sorted=False)  # [B, left_token]
 
-                        non_cls = x[:, 1:]
+                    non_cls = x[:, 1:]
 
-                        x_others = torch.gather(non_cls, dim=1, index=idx.unsqueeze(-1).expand(-1, -1, x.shape[-1]))  # [B, left_token, C]
+                    x_others = torch.gather(non_cls, dim=1, index=idx.unsqueeze(-1).expand(-1, -1, x.shape[-1]))  # [B, left_token, C]
 
-                        x = torch.cat([x[:, 0:1], x_others], dim=1)
+                    x = torch.cat([x[:, 0:1], x_others], dim=1)
 
         x = self.norm(x)
         if self.dist_token is None:

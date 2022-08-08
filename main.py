@@ -87,7 +87,6 @@ def get_args_pareser():
     # -----------------------------------------------------------------------------
     #  Uncertainty settings
     # -----------------------------------------------------------------------------
-    parser.add_argument("--uncertainty", action="store_true", help="Use uncertainty or not.")
     parser.add_argument('--uncertainty_keep_rate', type=float, default=0.8, help='Base drop rate (default: 0.8)')
     parser.add_argument("--mse", action="store_true", help="Set this argument when using uncertainty. Sets loss function to Expected Mean Square Error.")
     parser.add_argument("--digamma", action="store_true", help="Set this argument when using uncertainty. Sets loss function to Expected Cross Entropy.")
@@ -132,7 +131,6 @@ def main(args, logger):
         drop_loc=eval(args.drop_loc),
         num_classes=args.num_classes,
         global_pool=args.global_pool,
-        uncertainty=args.uncertainty,
         in_chans=args.in_chans,
     )
     logger.info('[Model]: \n{}'.format(model))
@@ -188,15 +186,7 @@ def main(args, logger):
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
     # Create criterion
-    if args.uncertainty:
-        if args.digamma:
-            criterion = edl_digamma_loss
-        elif args.log:
-            criterion = edl_log_loss
-        elif args.mse:
-            criterion = edl_mse_loss
-    else:
-        criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss()
 
     start_time = time.time()
 

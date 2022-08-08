@@ -44,16 +44,14 @@ def train_model(model, criterion, dataloader, optimizer, scheduler, args, logger
 
             output, _ = model(input)
 
-            if args.uncertainty:
-                loss = criterion(output, one_hot, epoch, args.num_classes, args.annealing_step, args.device)
-            else:
-                loss = criterion(output, target)
+            loss = criterion(output, target)
 
-            # Measure uncertainty
-            evidence = relu_evidence(output)
-            alpha = evidence + 1
-            uncertainty = args.num_classes / torch.sum(alpha, dim=1, keepdim=True)
-            uncertainty = torch.mean(uncertainty)
+            with torch.no_grad():
+                # Measure uncertainty
+                evidence = relu_evidence(output)
+                alpha = evidence + 1
+                uncertainty = args.num_classes / torch.sum(alpha, dim=1, keepdim=True)
+                uncertainty = torch.mean(uncertainty)
 
             # Measure accuracy and record loss
             loss_meter.update(loss.item(), target.size(0))

@@ -25,12 +25,10 @@ git clone https://github.com/Lee-JH-KR/Evidential_Uncertainty_Selection.git
 Change directory to the cloned repository by running `cd Evidential_Uncertainty_Selection`, install necessary packages.
 
 ## Training
-To train model on CIFAR-10, set the `data_path` (path to dataset) and `output_path` (result logging directory) in `train.sh` properly and run `sh ./train.sh`.
+To train model on MNIST, set the `data_path` (path to dataset) and `output_path` (result logging directory) in `train.sh` properly and run `sh ./train.sh`.
 
 Set `--base_keep_rate` and `--uncertainty_keep_rate` in train.sh `to use a different keep rate, and set `.
 
-## Finetuning
-First set the `data_path`, `output_path`, and `checkpoint` (the model checkpoint for finetuning) in `train.sh`, and then run `sh ./finetune.sh`.
 
 ## Evaluation
 To evaluate a trained model:
