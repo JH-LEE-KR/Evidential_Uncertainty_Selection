@@ -20,7 +20,7 @@ These packages can be installed by running `pip install -r requirements.txt`.
 
 First, clone the repository locally:
 ```
-git clone https://github.com/Lee-JH-KR/Evidential_Uncertainty_Selection.git
+git clone https://github.com/JH-LEE-KR/Evidential_Uncertainty_Selection.git
 ```
 Change directory to the cloned repository by running `cd Evidential_Uncertainty_Selection`, install necessary packages.
 
